@@ -39,9 +39,9 @@ Once you execute Stage 1, the script performs several handy quality-of-life modi
 
 * 🔓 **ADB Enabled:** Network ADB is activated (expires in 2037) so you can manage and sideload apps.
 * 🚀 **Monet Launcher Activated:** Replaces the cluttered stock interface with a clean, customizable TV launcher. The stock launcher is suspended to prevent boot ad reversion.
-* ⚡ **Shevery (Shizuku-Compatible API) Installed:** Standalone manager allowing supported apps to access privileged system APIs over ADB.
-* 🛑 **Automatic Firmware Updates Blocked:** OTA auto-updates are disabled (`com.jio.*` on JMSC/JMSB and `com.iwedia.*` on JHS) so your setup doesn't get overwritten.
-* 🚫 **Startup Boot Ads Disabled:** Annoying commercial promo and intro ads that display when powering on the STB are suppressed.
+* ⚡ **Shevery (Shizuku-Compatible API) Installed:** Standalone manager granted full permissions (`WRITE_SECURE_SETTINGS`, `DUMP`, `PACKAGE_USAGE_STATS`, AppOps, and battery exemption) so apps can access privileged APIs and ADB can be re-enabled through Shevery if ever disabled after reboot.
+* 🛑 **Automatic Updates, TR-069 & Telemetry Removed:** `com.jio.httpupdate`, `com.jio.usbupdate`, `com.jio.tr069client`, `com.rjil.jio.stb.commandreceiver`, `com.jio.backgroundscheduler`, and JHS `com.iwedia.*` OTA services are completely uninstalled (or disabled if protected by the ROM).
+* 🚫 **Startup Boot Ads Removed:** `com.jio.stbadservice` is completely uninstalled (or disabled if protected) so commercial promo and intro ads are suppressed.
 
 ---
 
@@ -280,10 +280,10 @@ Since the built-in package installer UI is disabled on the STB, install any Andr
 | `./stage1.sh --tasks` | Inspect all pending TR-069 tasks queued for your STB |
 | `./stage1.sh --clear-tasks` | Clear duplicate or stale tasks from GenieACS queue |
 | `./stage1.sh --stop` | Stop background `pass_front.py` process |
-| `./stage1.sh --yes-disable-tr069` | Explicitly permit disabling `com.jio.tr069client` in Stage 6 |
+| `./stage1.sh --yes-disable-tr069` | Legacy no-op flag (TR-069 & bloat deletion/fallback-disable now runs by default) |
 | `./jhs/run_acs.sh` | Mint eMudhra-forged TLS cert & start proxy for JHS boxes |
 | `./jhs/jhs_stage1.sh --status` | Display persisted Iwedia ADB properties and launcher state on JHS |
-| `./jhs/jhs_stage1.sh --post-setup` | Sideload Monet/Shevery and disable Iwedia OTA services on JHS |
+| `./jhs/jhs_stage1.sh --post-setup` | Sideload Monet/Shevery, delete/disable OTA & TR-069 packages, and grant Shevery permissions on JHS |
 | `./jhs/jhs_stage1.sh --clu-probe` | Queue native root command execution probe via `tr069native` |
 | `./jhs/jhs_stage1.sh --clu-read` | Read back executed command output from `tr069native` root probe |
 
@@ -301,7 +301,7 @@ If you find this guide too complicated or don't have the time to configure Docke
 
 ## ⚠️ Important Disclaimers
 
-* **Scope:** Stage 1 performs modifications such as enabling ADB, queueing downgrade flags, installing Monet Launcher and Shevery, disabling TR-069 settings, and disabling startup ads.
+* **Scope:** Stage 1 performs modifications such as enabling ADB, queueing downgrade flags, installing Monet Launcher and Shevery (with full permissions), and deleting (or disabling if protected) TR-069, OTA update, command receiver, background scheduler, and ad service packages.
 * **Root/Bootloader:** This guide deliberately excludes `unlock.sh` and `pull_boot.sh`. Do not run Stage 2 utilities unless you know what you are doing.
 * **Liability:** Use only on hardware you own or have explicit authorization to test.
 

@@ -35,8 +35,15 @@ OTA_PKGS=(
     com.iwedia.pvodupdateservice
     com.iwedia.updatercuotaservice
 )
+JIO_BLOAT_PKGS=(
+    com.jio.httpupdate
+    com.jio.usbupdate
+    com.jio.tr069client
+    com.rjil.jio.stb.commandreceiver
+    com.jio.backgroundscheduler
+    com.jio.stbadservice
+)
 STOCK_LAUNCHER="com.iwedia.ui.rjio.launcher.reliance"
-AD_PKG="com.jio.stbadservice"
 MONET_PKG="com.klevico.monet"
 SHEVERY_PKG="com.hamondev.shevery"
 
@@ -47,6 +54,10 @@ fail() { echo -e "  ${RED}✗${NC} $*"; }
 
 adb_sh() { "$ADB" -s "$STB_IP:$ADB_PORT" shell "$@" 2>&1; }
 ADB_PORT=5555
+
+JHS_REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=../lib/adb_helpers.sh
+source "$JHS_REPO_DIR/lib/adb_helpers.sh"
 
 enc() { python -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=''))" "$1" 2>/dev/null \
         || python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=''))" "$1"; }
@@ -119,20 +130,18 @@ for k in ('Enable','OnBootExecuteCmd','Output','Error','ValidityDate','lastExecu
 
         adb_sh settings put global device_provisioned 1
         adb_sh settings put global development_settings_enabled 1
+        adb_sh settings put global adb_enabled 1 >/dev/null 2>&1 || true
         log "provisioned + Developer Options enabled"
 
-        # OTA / update services (JHS names)
-        for p in "${OTA_PKGS[@]}"; do
-            out="$(adb_sh pm disable-user --user 0 "$p" | head -1)"
-            case "$out" in *"disabled-user"*) log "$p disabled" ;; *) warn "$p: $out" ;; esac
+        # Delete Jio TR-069, OTA, command receiver, scheduler & ad packages (disable if undeletable)
+        for p in "${JIO_BLOAT_PKGS[@]}"; do
+            remove_or_disable_pkg "$p" false
         done
-        adb_sh pm clear com.iwedia.httpupdate >/dev/null 2>&1
-        adb_sh pm clear com.iwedia.updateservice >/dev/null 2>&1
-        log "staged updates cleared"
 
-        # Ad service
-        out="$(adb_sh pm uninstall -k --user 0 "$AD_PKG" | head -1)"
-        log "$AD_PKG -> $out"
+        # Delete JHS Iwedia OTA / update services (disable if undeletable)
+        for p in "${OTA_PKGS[@]}"; do
+            remove_or_disable_pkg "$p" true
+        done
 
         # Apps
         HERE="$(cd "$(dirname "$0")/.." && pwd)"
@@ -149,14 +158,15 @@ for k in ('Enable','OnBootExecuteCmd','Output','Error','ValidityDate','lastExecu
         adb_sh input keyevent KEYCODE_HOME >/dev/null 2>&1
         log "$MONET_PKG set as home, stock launcher disabled"
 
-        adb_sh pm grant "$SHEVERY_PKG" android.permission.WRITE_SECURE_SETTINGS >/dev/null 2>&1
-        adb_sh pm grant "$SHEVERY_PKG" android.permission.PACKAGE_USAGE_STATS >/dev/null 2>&1
-        log "$SHEVERY_PKG permissions granted"
+        for pkg in "$SHEVERY_PKG" "moe.shizuku.privileged.api"; do
+            if pkg_installed_for_user "$pkg"; then
+                grant_shevery_permissions "$pkg"
+            fi
+        done
 
         echo -e "\n${GREEN}Done.${NC}"
         echo -e "Install anything else with: ${CYAN}$ADB -s $STB_IP:$ADB_PORT install file.apk${NC}"
-        echo -e "${YELLOW}Do NOT run ./stage1.sh --yes-disable-tr069${NC} — disabling com.jio.tr069client"
-        echo -e "is what would stop the box from re-asserting USBDebugging on each boot."
+        echo -e "${CYAN}Shevery has full permissions (including WRITE_SECURE_SETTINGS), so if ADB is disabled on reboot it can be re-enabled through Shevery.${NC}"
         ;;
 
     *)

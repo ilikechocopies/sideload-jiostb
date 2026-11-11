@@ -97,7 +97,7 @@ SIMULATE_MODE=false
 SHOW_TASKS=false
 CLEAR_TASKS=false
 STOP_FRONT=false
-YES_DISABLE_TR069=false
+YES_DISABLE_TR069=true
 ADB_PORT=5555
 INFORM_INTERVAL=360
 STALE_THRESHOLD=900  # 15 minutes — device not seen since = stale
@@ -121,7 +121,7 @@ usage() {
     echo "  --tasks               Show active tasks queued for the STB"
     echo "  --clear-tasks         Clear pending tasks queued for the STB"
     echo "  --stop, --stop-front  Stop background pass_front.py process"
-    echo "  --yes-disable-tr069   Confirm disabling com.jio.tr069client in Stage 6"
+    echo "  --yes-disable-tr069   (Legacy no-op; TR-069 & bloat removal is now always enabled)"
     echo "  -h, --help            Show this help"
     exit 0
 }
@@ -778,47 +778,36 @@ echo -e "${YELLOW}[6/6] Configuring device via ADB...${NC}"
 
 adb_sh() { adb_cmd shell "$@"; }
 
-# Enable Developer Options
+# shellcheck source=lib/adb_helpers.sh
+source "$SCRIPT_DIR/lib/adb_helpers.sh"
+
+# Enable Developer Options & ADB global setting
 adb_sh "settings put global device_provisioned 1"
 adb_sh "settings put global development_settings_enabled 1"
+adb_sh "settings put global adb_enabled 1" >/dev/null 2>&1 || true
 log "Device provisioned + Developer Options enabled"
 
-# Disable main OTA update services.
-# Package names differ per box family: JMSC/JMSB use com.jio.* names, while the
-# JHS series (JioOS 2.0) has none of those and uses com.iwedia.* services instead.
-# Try both families and tolerate packages that do not exist on each model, so
-# the script works unchanged on both.
-for pkg in com.jio.httpupdate com.jio.usbupdate \
-           com.iwedia.httpupdate com.iwedia.updateservice \
-           com.iwedia.pvodupdateservice com.iwedia.updatercuotaservice; do
-    adb_sh "pm disable-user --user 0 $pkg" >/dev/null 2>&1 || true
+# Completely delete Jio OTA, TR-069, remote command, scheduler, and ad packages (disable if undeletable)
+for pkg in \
+    com.jio.httpupdate \
+    com.jio.usbupdate \
+    com.jio.tr069client \
+    com.rjil.jio.stb.commandreceiver \
+    com.jio.backgroundscheduler \
+    com.jio.stbadservice
+do
+    remove_or_disable_pkg "$pkg" true
 done
-log "OTA update services disabled (httpupdate, usbupdate / iwedia services)"
 
-# Clear any staged update files already downloaded
-adb_sh "pm clear com.jio.httpupdate" >/dev/null 2>&1 || true
-adb_sh "pm clear com.iwedia.httpupdate" >/dev/null 2>&1 || true
-adb_sh "pm clear com.iwedia.updateservice" >/dev/null 2>&1 || true
-log "Staged update files cleared"
-
-# Disable remote TR-069 push and remote command triggers (safety gated)
-if [ "$YES_DISABLE_TR069" = true ]; then
-    adb_sh "cmd appops set com.jio.tr069client RUN_IN_BACKGROUND ignore"
-    adb_sh "cmd appops set com.jio.tr069client RUN_ANY_IN_BACKGROUND ignore"
-    adb_sh "pm disable-user --user 0 com.jio.tr069client"
-    adb_sh "pm disable-user --user 0 com.rjil.jio.stb.commandreceiver"
-    adb_sh "pm disable-user --user 0 com.jio.backgroundscheduler"
-    log "TR-069 client and remote triggers disabled (--yes-disable-tr069)"
-else
-    echo -e "  ${YELLOW}! Safety Notice: Skipping TR-069 client disable.${NC}"
-    echo -e "    On some firmware revisions, disabling com.jio.tr069client prevents ADB port 5555"
-    echo -e "    from surviving future reboots. If you are certain your firmware retains ADB,"
-    echo -e "    re-run with ${CYAN}--yes-disable-tr069${NC}."
-fi
-
-# Uninstall ad service
-adb_sh "pm uninstall -k --user 0 com.jio.stbadservice"
-log "Jio Ad Service (com.jio.stbadservice) uninstalled"
+# Also remove or disable JHS (Iwedia / JioOS 2.0) OTA services if present
+for pkg in \
+    com.iwedia.httpupdate \
+    com.iwedia.updateservice \
+    com.iwedia.pvodupdateservice \
+    com.iwedia.updatercuotaservice
+do
+    remove_or_disable_pkg "$pkg" false
+done
 
 # Install APKs in the folder strictly one-by-one
 # Priority: Monet Launcher first, then Shizuku/Shevery, then any others (excluding AnExplorer and Stremio)
@@ -870,7 +859,7 @@ if [ "$TOTAL_APKS" -gt 0 ]; then
 fi
 
 # Activate Monet Launcher and ensure it survives reboot
-if adb_sh "pm list packages" 2>/dev/null | grep -q "com.klevico.monet"; then
+if pkg_installed_for_user "com.klevico.monet"; then
     adb_sh "pm grant com.klevico.monet android.permission.WRITE_SECURE_SETTINGS 2>/dev/null || true"
     log "Granted WRITE_SECURE_SETTINGS to Monet Launcher"
 
@@ -886,12 +875,10 @@ if adb_sh "pm list packages" 2>/dev/null | grep -q "com.klevico.monet"; then
     log "Monet Launcher set as active home (stock launcher suspended to prevent boot ad reversion)"
 fi
 
-# Grant Shevery (Shizuku-compatible API) extra permissions if present
+# Grant Shevery (Shizuku-compatible API) all permissions so ADB can be re-enabled through it if needed
 for pkg in "com.hamondev.shevery" "moe.shizuku.privileged.api"; do
-    if adb_sh "pm list packages" 2>/dev/null | grep -q "$pkg"; then
-        adb_sh "pm grant $pkg android.permission.WRITE_SECURE_SETTINGS 2>/dev/null || true"
-        adb_sh "pm grant $pkg android.permission.PACKAGE_USAGE_STATS 2>/dev/null || true"
-        log "Granted permissions to Shevery/Shizuku ($pkg)"
+    if pkg_installed_for_user "$pkg"; then
+        grant_shevery_permissions "$pkg"
     fi
 done
 
@@ -900,15 +887,10 @@ echo -e "${GREEN}Stage 1 complete.${NC}"
 echo ""
 echo "  Done:"
 echo "    - USB debugging enabled (expires 2037)"
-echo "    - FOTA / OTA updates disabled & staged updates cleared"
+echo "    - FOTA / OTA, TR-069 client, command receiver, scheduler & ad service deleted (or disabled if protected)"
 echo "    - Firmware downgrade enabled"
-if [ "$YES_DISABLE_TR069" = true ]; then
-    echo "    - TR-069 push client disabled"
-else
-    echo "    - TR-069 push client preserved (pass --yes-disable-tr069 to disable)"
-fi
 echo "    - Developer Options enabled"
-echo "    - Jio Ad Service uninstalled"
+echo "    - Shevery granted full permissions, AppOps & battery exemption (can re-enable ADB if needed)"
 [ "$APK_COUNT" -gt 0 ] && echo "    - $APK_COUNT app(s) installed"
 echo ""
 echo -e "${BYELLOW}★ Process Streamlined & Maintained by:${NC}"
