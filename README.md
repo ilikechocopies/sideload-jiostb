@@ -7,7 +7,6 @@ A beginner-friendly, clutter-free walkthrough to enable **network ADB debugging*
 > * **Mail-In Service:** If you find this guide too technical or complicated, you can ship your box to Vishal Beniwal and he will set it up for you! Pay whatever your heart desires + return shipping.
 > * **Twitter / X:** [@ilikechocopies](https://x.com/ilikechocopies)
 > * **Reddit:** [u/ilikechocopies](https://www.reddit.com/user/ilikechocopies)
-> * **Instagram:** [@soloxsurfer](https://instagram.com/soloxsurfer)
 
 > [!NOTE]
 > **Supported Hardware & Firmware:**
@@ -289,7 +288,6 @@ If you find this guide too complicated or don't have the time to configure Docke
 * **Pricing:** Pay whatever your heart desires + return shipping charges.
 * **Contact Vishal Beniwal:**
   * **Twitter / X:** [@ilikechocopies](https://x.com/ilikechocopies)
-  * **Instagram:** [@soloxsurfer](https://instagram.com/soloxsurfer)
   * **Reddit:** [u/ilikechocopies](https://www.reddit.com/user/ilikechocopies)
 
 ---
@@ -305,7 +303,7 @@ If you find this guide too complicated or don't have the time to configure Docke
 ## 🌟 Credits & Acknowledgments
 
 * **Documentation, Windows 11 Streamlining & Maintenance:**  
-  Maintained by **Vishal Beniwal** — Twitter/X: [@ilikechocopies](https://x.com/ilikechocopies) | Instagram: [@soloxsurfer](https://instagram.com/soloxsurfer) | Reddit: [u/ilikechocopies](https://www.reddit.com/user/ilikechocopies)  
+  Maintained by **Vishal Beniwal** — Twitter/X: [@ilikechocopies](https://x.com/ilikechocopies) | Reddit: [u/ilikechocopies](https://www.reddit.com/user/ilikechocopies)  
   *The guide and personal support are completely free. If you'd like Vishal to handle the setup for you, pay whatever your heart desires + shipping—and keep him in your blessings!*
 
 * **Original Vulnerability Research & Tooling:**  
